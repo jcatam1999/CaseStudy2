@@ -1,37 +1,32 @@
 CityTempFile = 'C:\\RProjects\\CaseStudy2\\Analysis\\Data\\citytemp.csv'
 WorldTempFile = 'C:\\RProjects\\CaseStudy2\\Analysis\\Data\\TEMP.csv'
 ##read the file
-WorldTemp = read.csv(WorldTempFile, sep = ',', header = TRUE)
-
-##clean up the file
-##remove any empty average temps
-##rename columns
-##make dates a date
-##make numbers a number
-##function for dates
-standarDates <- function(string) {
-  patterns = c('[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9]','[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9]','[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
-               ,'[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9]','[0-9]/[0-9]/[0-9][0-9][0-9][0-9]','[0-9][0-9]/[0-9]/[0-9][0-9][0-9][0-9]')
-  formatdates = c('%Y/%m/%d','%d/%m/%Y','%Y-%m-%d','%m/%d/%Y','%m/%d/%Y','%m/%d/%Y')
-  standardformat='%d/%m/%Y'
-  for(i in 1:6){
-    if(grepl(patterns[i], string)){
-      aux=as.Date(string,format=formatdates[i])
-      if(!is.na(aux)){
-        return(format(aux, standardformat))
-      }
-    }
-  }
-  return('FALSE')
-}
+WorldTemp = read.csv(WorldTempFile, sep = ',', header = TRUE, stringsAsFactors = FALSE)
+library(stringr)
+library(plyr)
 
 
-##conver the date
-##WorldTemp$Date = as.Date(WorldTemp$Date, format='%y/%m/%d')
+#get rid of any dates less than year 1900
+WorldTemp$Year =  ifelse(grepl('-',WorldTemp$Date), unlist(str_split_fixed(WorldTemp$Date, '-', 3), recursive = FALSE)[,1],'2')
+WorldTemp$Year = as.numeric(WorldTemp$Year)
+WorldTemp = subset(WorldTemp, (WorldTemp$Year >1899) | (WorldTemp$Year == 2))
+##check the next format of dates
+WorldTemp$Year =  ifelse(grepl('/',WorldTemp$Date), unlist(str_split_fixed(WorldTemp$Date, '/', 3), recursive = FALSE)[,3],'2')
+WorldTemp$Year = as.numeric(WorldTemp$Year)
+WorldTemp = subset(WorldTemp, (WorldTemp$Year >1899) | (WorldTemp$Year == 2))
+##break out month
+WorldTemp$Month =  ifelse(grepl('/',WorldTemp$Date), unlist(str_split_fixed(WorldTemp$Date, '/', 3), recursive = FALSE)[,1],'2')
+##convert temp
+WorldTemp$Monthly.AverageTemp = as.numeric(WorldTemp$Monthly.AverageTemp)
+##remove NA
+WorldTemp = subset(WorldTemp, WorldTemp$Monthly.AverageTemp !='NA')
 
-for(Date in WorldTemp)
-  {
-    print(Date)
-    result = standarDates(Date)
-    print(result)
-}
+#get mean by month
+v = tapply(WorldTemp$Monthly.AverageTemp, by=c('WorldTemp$Month', 'WorldTemp$Country'), mean)
+grcol = c('WorldTemp$Month', 'WorldTemp$Country')
+v= aggregate(WorldTemp$Monthly.AverageTemp, by=list(WorldTemp$Country, WorldTemp$Month), mean)
+v = arrange(v, v$Group.1)
+head(v)
+
+
+
