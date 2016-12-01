@@ -1,0 +1,251 @@
+---
+title: "Case Study 2"
+author: "Jeff Chandler"
+date: "December 1, 2016"
+output: html_document
+---
+
+#__INTRODUCTION__
+
+###This project entails four primary sections with multiple tasks under each section. This project was primarily done in R, however in the first section there will be 2 pieces of code that are for SAS and Python.
+
+
+##This section of code will perform the following items:
+  * Create the X matrix and print from result from SAS
+  
+      SAS code
+
+        proc iml;
+        reset print;
+        X = {4 5 1 2,
+	            1 0 3 5,
+	            2 1 8 2};
+        print X;
+
+  * Create the X matrix and print from result from Python
+  
+        Python Code
+          import numpy as np
+          X = np.matrix([[4,5,1,2], [1,0,3,5],[2,1,8,2]])
+          X
+          matrix([[4, 5, 1, 2],
+                  [1, 0, 3, 5],
+                  [2, 1, 8, 2]])
+
+  * Create the X matrix and print from result from R
+```{r}
+
+r = c(4,5,1,2,1,0,3,5,2,1,8,2)
+X = matrix(r, nrow=3, ncol = 4, byrow = TRUE)
+print(X)
+```
+
+##This section of code will perform the following items:
+  * Download the data for S&P stock AGIO
+  * Calculate log returns.
+  * Calculate volatility measure.
+  * Calculate volatility over entire length of series for the different decay factors.
+  * Plot the results, overlaying the volatility curves on the data, just as was done in the S&P example.
+
+```{r}
+##Set Working directory
+setwd('C:\\RProjects\\CaseStudy2\\Analysis')
+
+##Install tseries package
+source('Packageinstall.R')
+
+##get the data
+histquot = get.hist.quote('agio', quote = 'Close')
+
+##Get return
+snpreturn = log(lag(histquot)) - log(histquot)
+
+##volatility
+snpvol = sd(snpreturn) * sqrt(250) * 100
+##Function
+vol = function(d, logrets){
+  var=0
+  lam=0
+  varlist = c()
+  for (r  in logrets) 
+  {
+    lam = lam*(1 -1/d) + 1
+    var = (1-1/lam)*var + (1/lam)*r^2
+    varlist = c(varlist, var)
+    
+  }
+  sqrt(varlist)
+}
+volest = vol(10,snpreturn)
+volest1 = vol(30, snpreturn)
+volest2 = vol(100, snpreturn)
+head(volest)
+head(volest1)
+head(volest2)
+plot(volest*100, type = 'l', col='red')
+lines(volest1*100, type = 'l',col='green')
+lines(volest2*100, type = 'l', col='blue')
+```
+
+##This section of code we will use the built-in dataset from R called Orange and perform the following:
+
+  * Calculate the mean and the median of the trunk circumferences for different size of the trees. (Tree)
+  * Make a scatter plot of the trunk circumferences against the age of the tree. Use different plotting symbols for different size of trees.
+  * Display the trunk circumferences on a comparative boxplot against tree. Be sure you order the boxplots in the increasing order of maximum diameter.
+
+```{r}
+
+print(aggregate(Orange[3], list(Orange$Tree), mean))
+print(aggregate(Orange[3], list(Orange$Tree), median))
+
+plot(Orange$age, Orange$circumference, pch=c(16,17,18,14,15)[as.numeric(Orange$Tree)], main='Circumference of Tree by age'
+      , col=c('red','blue','green', 'purple', 'black')[as.numeric(Orange$Tree)],xlab = 'Tree Age(days since 12/31/1968)', ylab = 'Circumference(mm)')
+
+
+##boxplots
+boxplot(Orange$circumference~Orange$Tree, main='Tree Circumference by Tree', xlab='Tree Number', ylab='Circumference(mm)')
+```
+##In this section we have 3 subsections of tasks that will be performed
+* Find the difference between the maximum and the minimum monthly average temperatures for each country and report/visualize top 20 countries with       the maximum differences for the period since 1900.
+
+```{R}
+CityTempFile = 'C:\\RProjects\\CaseStudy2\\Analysis\\Data\\citytemp.csv'
+WorldTempFile = 'C:\\RProjects\\CaseStudy2\\Analysis\\Data\\TEMP.csv'
+##read the file
+##read the file
+WorldTemp = read.csv(WorldTempFile, sep = ',', header = TRUE, stringsAsFactors = FALSE)
+
+library(stringr)
+library(plyr)
+
+
+#get rid of any dates less than year 1900
+WorldTemp$Year =  ifelse(grepl('-',WorldTemp$Date), unlist(str_split_fixed(WorldTemp$Date, '-', 3), recursive = FALSE)[,1],'2')
+WorldTemp$Year = as.numeric(WorldTemp$Year)
+WorldTemp = subset(WorldTemp, (WorldTemp$Year >1899) | (WorldTemp$Year == 2))
+##check the next format of dates
+WorldTemp$Year =  ifelse(grepl('/',WorldTemp$Date), unlist(str_split_fixed(WorldTemp$Date, '/', 3), recursive = FALSE)[,3],'2')
+WorldTemp$Year = as.numeric(WorldTemp$Year)
+WorldTemp = subset(WorldTemp, (WorldTemp$Year >1899) | (WorldTemp$Year == 2))
+##break out month
+WorldTemp$Month =  ifelse(grepl('/',WorldTemp$Date), unlist(str_split_fixed(WorldTemp$Date, '/', 3), recursive = FALSE)[,1],'2')
+##convert temp
+WorldTemp$Monthly.AverageTemp = as.numeric(WorldTemp$Monthly.AverageTemp)
+##remove NA
+WorldTemp = subset(WorldTemp, WorldTemp$Monthly.AverageTemp !='NA')
+
+#get mean by month
+#v = tapply(WorldTemp$Monthly.AverageTemp, by=c('WorldTemp$Month', 'WorldTemp$Country'), mean)
+v = aggregate(WorldTemp$Monthly.AverageTemp, by = list(WorldTemp$Month, WorldTemp$Country), FUN=mean, na.rm=TRUE)
+xmin = round(tapply(v$x, v$Group.2, min), digits = 2)
+xmax = round(tapply(v$x, v$Group.2, max), digits = 2)
+
+##merge the data
+cminmax = data.frame(xmin,xmax)
+##convert row names
+cminmax = cbind(country = rownames(cminmax), cminmax)
+##calculate the difference
+cminmax$diff = cminmax$xmax - cminmax$xmin
+##order by diff
+cminmax = cminmax[order(cminmax$diff, decreasing = TRUE),]
+##get top 20
+top20 = cminmax[1:20,]
+
+##plot results
+#plot(top20$diff, col='blue', x=top20$country)
+
+par(las=2)
+par(mar=c(8,4,2,2))
+barplot(top20$diff, main = 'Largest Tempature Difference', xlab = 'Country', ylab = 'Degree (F)')
+```
+
+  * This subsetion performs the following 3 tasks:
+    a)	Create a new column to display the monthly average land temperatures in Fahrenheit (°F).
+    b)	Calculate average land temperature by year and plot it. The original file has the average land temperature by month. 
+    c)	Calculate the one year difference of average land temperature by year and provide the maximum difference (value) with corresponding two years.
+
+```{R}    
+##pull in City data
+CityTemp = read.csv(CityTempFile, sep = ',', header = TRUE, stringsAsFactors = FALSE)
+
+
+#get rid of any dates less than year 1900
+CityTemp$Year =  ifelse(grepl('-',CityTemp$Date), unlist(str_split_fixed(CityTemp$Date, '-', 3), recursive = FALSE)[,1],'2')
+
+##set year to numberic
+CityTemp$Year = as.numeric(CityTemp$Year)
+
+##subset the data
+CityTemp = subset(CityTemp, (CityTemp$Year >1989) | (CityTemp$Year == 2))
+
+##check the next format of dates
+CityTemp$Year =  ifelse(grepl('/',CityTemp$Date), unlist(str_split_fixed(CityTemp$Date, '/', 3), recursive = FALSE)[,3],'2')
+##change to number
+CityTemp$Year = as.numeric(CityTemp$Year)
+##subset based on year
+CityTemp = subset(CityTemp, (CityTemp$Year >1989) | (CityTemp$Year == 2))
+##break out month
+CityTemp$Month =  ifelse(grepl('/',CityTemp$Date), unlist(str_split_fixed(CityTemp$Date, '/', 3), recursive = FALSE)[,1],'2')
+##convert temp
+CityTemp$Monthly.AverageTemp = as.numeric(CityTemp$Monthly.AverageTemp)
+##remove NA
+CityTemp = subset(CityTemp, CityTemp$Monthly.AverageTemp !='NA')
+
+CityTemp$TempInFah = round(CityTemp$Monthly.AverageTemp *(9/5) + 32, digits = 2)
+
+##get the average temp by year
+v = round(tapply(CityTemp$TempInFah, CityTemp$Year, mean), digits = 2)
+v = data.frame(v)
+
+##convert row lable to column
+v = cbind(Year = rownames(v), v)
+##plot it
+
+plot(v, xlab = "YEAR", ylab = 'Tempature (F)', col='red')
+#remove row names
+colnames(v) = c('year', 'temp')
+#drop the levels
+
+
+for (i in 1:nrow(v$temp)) {
+  if(i > 1){
+    print(v$temp[i] - v$temp[i-1], row.names = FALSE)
+  }
+}
+```
+
+*  In this section we will perform the following task:
+    a.	Find the difference between the maximum and the minimum temperatures for each major city and report/visualize top 20 cities with maximum               differences for the period since 1900. 
+    
+```{R}
+
+##this section showscity temp
+CityTemp$Month = as.numeric(CityTemp$Month)
+
+
+v2 = aggregate(CityTemp$TempInFah, by = list(CityTemp$Month, CityTemp$City), FUN=mean, na.rm=TRUE)
+xmin = round(tapply(v2$x, v2$Group.2, min), digits = 2)
+xmax = round(tapply(v2$x, v2$Group.2, max), digits = 2)
+
+
+##merge the data
+cminmax = data.frame(xmin,xmax)
+##convert row names
+cminmax = cbind(country = rownames(cminmax), cminmax)
+##calculate the difference
+cminmax$diff = cminmax$xmax - cminmax$xmin
+##order by diff
+cminmax = cminmax[order(cminmax$diff, decreasing = TRUE),]
+##get top 20
+top20 = cminmax[1:20,]
+
+##plot results
+par(las=2)
+par(mar=c(8,4,2,2))
+barplot(top20$diff, main = 'Largest Tempature Difference', xlab = 'City', ylab = 'Degree (F)')
+```
+
+#__CONCLUSION__
+###In conclusion, it is clear from the Country and City graphs that those Countries and Cities that are farther North have a much larger differential in tempature that those closer to the equator.
+
+
